@@ -181,12 +181,19 @@ class RoonDevice(MediaPlayerEntity):
             volume_muted = volume_data["is_muted"]
             volume_step = convert(volume_data["step"], int, 0)
 
-            if volume_data["type"] == "db":
-                level = convert(volume_data["value"], float, 0.0) / 80 * 100 + 100
-            else:
-                level = convert(volume_data["value"], float, 0.0)
+            volume_max = volume_data["max"]
+            volume_min = volume_data["min"]
+            volume_current_level = volume_data["value"]
 
-            volume_level = convert(level, int, 0) / 100
+            volume_range = volume_max - volume_min
+            volume_percentage_factor = 100 / volume_range
+
+            if volume_current_level > 0:
+              volume_percentage_level = volume_current_level * volume_percentage_factor
+            else:
+              volume_percentage_level = (volume_range + volume_current_level) * volume_percentage_factor
+
+            volume_level = convert(volume_percentage_level, int, 0) / 100
         except KeyError:
             # catch KeyError
             pass
@@ -329,7 +336,13 @@ class RoonDevice(MediaPlayerEntity):
     def set_volume_level(self, volume: float) -> None:
         """Send new volume_level to device."""
         volume = int(volume * 100)
-        self._server.roonapi.change_volume(self.output_id, volume)
+        volume_data = self.player_data["volume"]
+        volume_max = volume_data["max"]
+        volume_min = volume_data["min"]
+        volume_range = volume_max - volume_min
+        volume_percentage_factor = volume_range / 100
+        percentage_volume = volume_min + volume * volume_percentage_factor
+        self._server.roonapi.change_volume(self.output_id, percentage_volume)
 
     def mute_volume(self, mute=True):
         """Send mute/unmute to device."""
@@ -337,11 +350,23 @@ class RoonDevice(MediaPlayerEntity):
 
     def volume_up(self) -> None:
         """Send new volume_level to device."""
-        self._server.roonapi.change_volume(self.output_id, 3, "relative")
+        volume_data = self.player_data["volume"]
+        volume_max = volume_data["max"]
+        volume_min = volume_data["min"]
+        volume_range = volume_max - volume_min
+        volume_percentage_factor = volume_range / 100
+        volume_percentage_change = convert(3 * volume_percentage_factor, int, 0)
+        self._server.roonapi.change_volume(self.output_id, volume_percentage_change, "relative")
 
     def volume_down(self) -> None:
         """Send new volume_level to device."""
-        self._server.roonapi.change_volume(self.output_id, -3, "relative")
+        volume_data = self.player_data["volume"]
+        volume_max = volume_data["max"]
+        volume_min = volume_data["min"]
+        volume_range = volume_max - volume_min
+        volume_percentage_factor = volume_range / 100
+        volume_percentage_change = convert(3 * volume_percentage_factor, int, 0)
+        self._server.roonapi.change_volume(self.output_id, -volume_percentage_change, "relative")
 
     def turn_on(self) -> None:
         """Turn on device (if supported)."""
